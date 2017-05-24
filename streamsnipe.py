@@ -203,7 +203,7 @@ def get_top_streamers_response(intent):
     streamers = get_top_streamers()
     if streamers:
         s = ', '.join(streamers)
-        speech_output = 'The top streamers right now are {}'.format(s)
+        speech_output = 'The top ten streamers right now are {}'.format(s)
     else:
         speech_output = 'It doesn\'t look like there are any top '\
                         'streamers at the moment.'
@@ -278,7 +278,7 @@ def get_top_streamers():
             streams = sorted(resp['streams'], key=lambda k: k['viewers'], reverse=True)
 
             top = ['{} playing {}'.format(k['channel']['display_name'].encode('utf-8'),
-                                      k['channel']['game'].encode('utf-8')) for k in streams[:5]]
+                                      k['channel']['game'].encode('utf-8')) for k in streams[:10]]
         except AttributeError:
             # Stream JSON has been proven unreliable. Ignore nameless/gameless
             # results.
@@ -313,4 +313,4 @@ if __name__ == '__main__':
 
     #print(get_top_streamers())
 
-    print(get_featured_streamers())
+    print(get_top_streamers())
