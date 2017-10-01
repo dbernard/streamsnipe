@@ -2,8 +2,12 @@ from __future__ import print_function
 
 import json
 import requests
+import ConfigParser
 
-CLIENT = 'rf2wbmqoul3ucilhakgswp9oki2jip'
+config = ConfigParser.ConfigParser()
+config.readfp(open('config/auth.cfg'))
+
+CLIENT = config.get('AUTH', 'client')
 
 
 def lambda_handler(event, context):
@@ -138,12 +142,12 @@ def get_unknown_intent_response():
 def get_welcome_response():
     session_attributes = {}
     card_title = "StreamSnipe"
-    speech_output = "Ask me if your favorite streamer is online or for the " \
-                    "top streamers playing your favorite game."
+    speech_output = "Ask me who the top streamers are, who the featured " \
+                    "streamers are, or who is streaming your favorite game."
     # If the user either does not reply to the welcome message or says something
     # that is not understood, they will be prompted again with this text.
-    reprompt_text = "Ask me if your favorite streamer is online or for the " \
-                    "top streamers playing your favorite game."
+    reprompt_text = "Ask me who the top streamers are, who the featured " \
+                    "streamers are, or who is streaming your favorite game."
 
     should_end_session = False
     return build_response(session_attributes, build_speechlet_response(
@@ -157,14 +161,23 @@ def get_streamers_by_game_response(intent):
     should_end_session = True
 
     if 'Game' in intent['slots']:
-        game = intent['slots']['Game']['value']
+        try:
+            game = intent['slots']['Game']['value']
+        except KeyError:
+            speech_output = 'Hm, you didn\'t tell me which game you wanted to hear about. ' \
+                            'Ask me again with the game you\'re interested in.'
+            reprompt_text = speech_output
+
+            return build_response(session_attributes, build_speechlet_response(
+                card_title, speech_output, reprompt_text, should_end_session))
+
         streamers = get_streamers_by_game(game)
 
         if streamers:
             s = ', '.join(streamers)
-            speech_output = 'The top {} streamers are {}.'.format(game, s)
+            speech_output = 'The top {} streamers on Twitch dot TV are {}.'.format(game, s)
         else:
-            speech_output = 'I couldn\'t find anyone streaming {} right now.'.format(game)
+            speech_output = 'I couldn\'t find anyone streaming {} on Twitch dot TV right now.'.format(game)
 
         reprompt_text = 'Ask me who is streaming your favorite game.'
     else:
@@ -179,16 +192,16 @@ def get_streamers_by_game_response(intent):
 def get_featured_streamers_response(intent):
     card_title = 'Featured Streamers'
     session_attributes = {}
-    reprompt_text = 'Ask me who the featured streamers are right now.'
+    reprompt_text = 'Ask me who the featured streamers on Twitch dot TV are right now.'
     should_end_session = True
 
     streamers = get_featured_streamers()
     if streamers:
         s = ', '.join(streamers)
-        speech_output = 'The featured streamers right now are {}'.format(s)
+        speech_output = 'The featured streamers on Twitch dot TV right now are {}'.format(s)
     else:
         speech_output = 'It doesn\'t look like there are any featured '\
-                        'streamers at the moment.'
+                        'streamers on Twitch dot TV at the moment.'
 
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
@@ -197,16 +210,16 @@ def get_featured_streamers_response(intent):
 def get_top_streamers_response(intent):
     card_title = 'Top Streamers'
     session_attributes = {}
-    reprompt_text = 'Ask me who the top streamers are right now.'
+    reprompt_text = 'Ask me who the top streamers on Twitch dot TV are right now.'
     should_end_session = True
 
     streamers = get_top_streamers()
     if streamers:
         s = ', '.join(streamers)
-        speech_output = 'The top ten streamers right now are {}'.format(s)
+        speech_output = 'The top ten streamers on Twitch dot TV right now are {}'.format(s)
     else:
         speech_output = 'It doesn\'t look like there are any top '\
-                        'streamers at the moment.'
+                        'streamers on Twitch dot TV at the moment.'
 
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
@@ -228,6 +241,8 @@ def get_streamers_by_game(game):
     if resp['streams']:
         try:
             streams = sorted(resp['streams'], key=lambda k: k['viewers'], reverse=True)
+
+            streams = _get_only_ascii(streams)
 
             top = [k['channel']['display_name'] for k in streams[:5]]
         except AttributeError:
@@ -277,6 +292,8 @@ def get_top_streamers():
         try:
             streams = sorted(resp['streams'], key=lambda k: k['viewers'], reverse=True)
 
+            streams = _get_only_ascii(streams)
+
             top = ['{} playing {}'.format(k['channel']['display_name'].encode('utf-8'),
                                       k['channel']['game'].encode('utf-8')) for k in streams[:10]]
         except AttributeError:
@@ -285,6 +302,12 @@ def get_top_streamers():
             pass
 
     return top
+
+
+def _get_only_ascii(streams):
+    trimmed = [stream for stream in streams if all(ord(char) < 128 for char in stream['channel']['display_name'])]
+
+    return trimmed
 
 
 def _get_stream_name(stream):
@@ -309,8 +332,7 @@ def _get_stream_game(stream):
 
 
 if __name__ == '__main__':
-    #print(get_streamers_by_game('overwatch'))
-
-    #print(get_top_streamers())
+    print(get_streamers_by_game('overwatch'))
 
     print(get_top_streamers())
+
